@@ -1,0 +1,1 @@
+/var/www/html/econews/econews-back/web/app/plugins/query-monitor/wp-content/db.php

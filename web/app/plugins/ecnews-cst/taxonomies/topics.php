@@ -5,7 +5,7 @@
  * for use with 'guides', 'investigations', 'news', 'studies'.
  */
 function topics_init() {
-	register_taxonomy( 'topics', [ 'guides', 'investigations', 'news', 'studies' ], [
+	register_taxonomy( 'topics', [ 'guides', 'investigations', 'news', 'studies', 'projects' ], [
 		'hierarchical'          => false,
 		'public'                => true,
 		'show_in_nav_menus'     => true,

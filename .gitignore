@@ -1,6 +1,7 @@
 # Application
 web/app/plugins/*
 !web/app/plugins/ecnews-cst
+!web/app/plugins/jwt-authentication-for-wp-rest-api
 web/app/mu-plugins/*/
 web/app/themes/twentytwentytwo/
 web/app/upgrade

@@ -1,7 +1,8 @@
 <?php
 
-/** Requiere the JWT library. */
-use \Firebase\JWT\JWT;
+/** Require the JWT library. */
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
 /**
  * The public-facing functionality of the plugin.
@@ -75,16 +76,18 @@ class Jwt_Auth_Public
         register_rest_route($this->namespace, 'token', array(
             'methods' => 'POST',
             'callback' => array($this, 'generate_token'),
+            'permission_callback' => '__return_true',
         ));
 
         register_rest_route($this->namespace, 'token/validate', array(
             'methods' => 'POST',
             'callback' => array($this, 'validate_token'),
+            'permission_callback' => '__return_true',
         ));
     }
 
     /**
-     * Add CORs suppot to the request.
+     * Add CORs support to the request.
      */
     public function add_cors_support()
     {
@@ -95,13 +98,13 @@ class Jwt_Auth_Public
         }
     }
 
-    /**
-     * Get the user and password in the request body and generate a JWT
-     *
-     * @param [type] $request [description]
-     *
-     * @return [type] [description]
-     */
+	/**
+	 * Get the user and password in the request body and generate a JWT
+	 *
+	 * @param [type] $request [description]
+	 *
+	 * @return mixed|WP_Error|null [type] [description]
+	 */
     public function generate_token($request)
     {
         $secret_key = defined('JWT_AUTH_SECRET_KEY') ? JWT_AUTH_SECRET_KEY : false;
@@ -112,7 +115,7 @@ class Jwt_Auth_Public
         if (!$secret_key) {
             return new WP_Error(
                 'jwt_auth_bad_config',
-                __('JWT is not configurated properly, please contact the admin', 'wp-api-jwt-auth'),
+                __('JWT is not configured properly, please contact the admin', 'wp-api-jwt-auth'),
                 array(
                     'status' => 403,
                 )
@@ -121,7 +124,7 @@ class Jwt_Auth_Public
         /** Try to authenticate the user with the passed credentials*/
         $user = wp_authenticate($username, $password);
 
-        /** If the authentication fails return a error*/
+        /** If the authentication fails return an error*/
         if (is_wp_error($user)) {
             $error_code = $user->get_error_code();
             return new WP_Error(
@@ -151,7 +154,11 @@ class Jwt_Auth_Public
         );
 
         /** Let the user modify the token data before the sign. */
-        $token = JWT::encode(apply_filters('jwt_auth_token_before_sign', $token, $user), $secret_key);
+        $token = JWT::encode(
+            apply_filters('jwt_auth_token_before_sign', $token, $user),
+            $secret_key,
+            apply_filters('jwt_auth_algorithm', 'HS256')
+        );
 
         /** The token is signed, now create the object with no sensible user data to the client*/
         $data = array(
@@ -184,13 +191,14 @@ class Jwt_Auth_Public
          **/
         $rest_api_slug = rest_get_url_prefix();
         $valid_api_uri = strpos($_SERVER['REQUEST_URI'], $rest_api_slug);
-        if (!$valid_api_uri) {
+        // if already valid user or invalid url, don't attempt to validate token
+        if ( !$valid_api_uri || $user ) {
             return $user;
         }
 
         /*
          * if the request URI is for validate the token don't do anything,
-         * this avoid double calls to the validate_token function.
+         * this avoids double calls to the validate_token function.
          */
         $validate_uri = strpos($_SERVER['REQUEST_URI'], 'token/validate');
         if ($validate_uri > 0) {
@@ -201,7 +209,7 @@ class Jwt_Auth_Public
 
         if (is_wp_error($token)) {
             if ($token->get_error_code() != 'jwt_auth_no_auth_header') {
-                /** If there is a error, store it to show it after see rest_pre_dispatch */
+                /** If there is an error, store it to show it after see rest_pre_dispatch */
                 $this->jwt_error = $token;
                 return $user;
             } else {
@@ -213,7 +221,7 @@ class Jwt_Auth_Public
     }
 
     /**
-     * Main validation function, this function try to get the Autentication
+     * Main validation function, this function try to get the Authentication
      * headers and decoded.
      *
      * @param bool $output
@@ -263,7 +271,7 @@ class Jwt_Auth_Public
         if (!$secret_key) {
             return new WP_Error(
                 'jwt_auth_bad_config',
-                'JWT is not configurated properly, please contact the admin',
+                'JWT is not configured properly, please contact the admin',
                 array(
                     'status' => 403,
                 )
@@ -272,7 +280,10 @@ class Jwt_Auth_Public
 
         /** Try to decode the token */
         try {
-            $token = JWT::decode($token, $secret_key, array('HS256'));
+            $token = JWT::decode(
+                $token,
+                new Key($secret_key, apply_filters('jwt_auth_algorithm', 'HS256'))
+            );
             /** The Token is decoded now validate the iss */
             if ($token->iss != get_bloginfo('url')) {
                 /** The iss do not match, return error */
@@ -318,12 +329,14 @@ class Jwt_Auth_Public
         }
     }
 
-    /**
-     * Filter to hook the rest_pre_dispatch, if the is an error in the request
-     * send it, if there is no error just continue with the current request.
-     *
-     * @param $request
-     */
+	/**
+	 * Filter to hook the rest_pre_dispatch, if the is an error in the request
+	 * send it, if there is no error just continue with the current request.
+	 *
+	 * @param $request
+	 *
+	 * @return mixed|WP_Error|null
+	 */
     public function rest_pre_dispatch($request)
     {
         if (is_wp_error($this->jwt_error)) {

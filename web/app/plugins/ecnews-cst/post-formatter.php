@@ -34,4 +34,15 @@ add_action('rest_api_init', function() {
     );
 });
 
+// Remove HTML tags from API response data
+//! 'remove_filter()' = Removes a callback function from a filter hook
+//! 'remove_filter( string $hook_name, callable|string|array $callback, int $priority = 10)'
+// '$hook_name' = The filter hook to which the function to be removed is hooked
+    // Here, I want to get rid of the HTML tags of the title and the excerpt of posts.
+// '$callback' = The callback to be removed from running when the filter is applied
+    // Here, it's 'wpautop' which is a group of regex used to identify text and format it.
+    // https://developer.wordpress.org/reference/functions/wpautop/
+remove_filter('the_title', 'wpautop');
+remove_filter('the_excerpt', 'wpautop');
+
 ?>
